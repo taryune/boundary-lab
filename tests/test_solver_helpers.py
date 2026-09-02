@@ -1,10 +1,12 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from blab.config import ChannelConfig, CrossoverConfig, RadiatorConfig
 from blab.solver import (
     HornBEMSolver,
+    _configure_bempp_vectorization,
     _flat_target_correction,
     _split_frequencies_evenly,
     build_fibonacci_sphere_observation_points,
@@ -114,3 +116,37 @@ def test_flat_target_correction_is_inverse_on_axis_pressure_magnitude() -> None:
     assert np.isclose(_flat_target_correction(2.0 + 0.0j), 0.5)
     assert _flat_target_correction(0.0 + 0.0j) == 1.0
     assert _flat_target_correction(np.nan + 0.0j) == 1.0
+
+
+def test_bempp_vectorization_mode_override_accepts_known_modes(monkeypatch) -> None:
+    import bempp_cl.api
+
+    monkeypatch.setattr(bempp_cl.api, "VECTORIZATION_MODE", "auto", raising=False)
+    monkeypatch.setenv("BLAB_BEMPP_VECTORIZATION_MODE", "novec")
+
+    _configure_bempp_vectorization()
+
+    assert bempp_cl.api.VECTORIZATION_MODE == "novec"
+
+
+def test_bempp_vectorization_mode_override_is_optional(monkeypatch) -> None:
+    import bempp_cl.api
+
+    monkeypatch.setattr(bempp_cl.api, "VECTORIZATION_MODE", "auto", raising=False)
+    monkeypatch.delenv("BLAB_BEMPP_VECTORIZATION_MODE", raising=False)
+
+    _configure_bempp_vectorization()
+
+    assert bempp_cl.api.VECTORIZATION_MODE == "auto"
+
+
+def test_bempp_vectorization_mode_override_rejects_unknown_modes(monkeypatch) -> None:
+    import bempp_cl.api
+
+    monkeypatch.setattr(bempp_cl.api, "VECTORIZATION_MODE", "auto", raising=False)
+    monkeypatch.setenv("BLAB_BEMPP_VECTORIZATION_MODE", "vec32")
+
+    with pytest.warns(RuntimeWarning, match="BLAB_BEMPP_VECTORIZATION_MODE"):
+        _configure_bempp_vectorization()
+
+    assert bempp_cl.api.VECTORIZATION_MODE == "auto"

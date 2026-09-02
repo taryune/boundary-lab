@@ -45,6 +45,33 @@ bempp_cl.api.BOUNDARY_OPERATOR_DEVICE_TYPE = "cpu"
 bempp_cl.api.POTENTIAL_OPERATOR_DEVICE_TYPE = "cpu"
 bempp_cl.api.DEFAULT_PRECISION = "single"
 
+BEMPP_VECTORIZATION_MODES = ("auto", "novec", "vec4", "vec8", "vec16")
+
+
+def _configure_bempp_vectorization() -> None:
+    """Allow BLAB_BEMPP_VECTORIZATION_MODE to override Bempp kernel vectorization.
+
+    Bempp selects an explicitly vectorized OpenCL kernel by default. Some OpenCL
+    runtimes (notably pocl) crash while compiling or running those kernels, so an
+    escape hatch to ``novec`` is needed to keep the Bempp CPU backend usable.
+    """
+
+    requested = os.environ.get("BLAB_BEMPP_VECTORIZATION_MODE", "").strip().lower()
+    if not requested:
+        return
+    if requested not in BEMPP_VECTORIZATION_MODES:
+        warnings.warn(
+            f"Ignoring BLAB_BEMPP_VECTORIZATION_MODE={requested!r}; "
+            f"expected one of {', '.join(BEMPP_VECTORIZATION_MODES)}.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
+    bempp_cl.api.VECTORIZATION_MODE = requested
+
+
+_configure_bempp_vectorization()
+
 
 @dataclass
 class RadiatorGeometry:
